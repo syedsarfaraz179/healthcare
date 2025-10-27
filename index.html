@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Payment Form — Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f7f9fc; color:#111; padding:30px; }
+    .container { max-width:560px; margin:0 auto; background:#fff; padding:20px;border-radius:8px; box-shadow:0 6px 18px rgba(50,50,93,0.08);}
+    h2 { margin-top:0; }
+    label { display:block; margin:12px 0 6px; font-weight:600; }
+    input[type="text"], input[type="tel"], input[type="number"] { width:100%; padding:10px; border:1px solid #dbe4ef; border-radius:6px; box-sizing:border-box; }
+    .row { display:flex; gap:12px; }
+    .row .col { flex:1; }
+    .btn { margin-top:16px; padding:10px 14px; background:#0066ff; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+    .note { font-size:13px; color:#555; margin-top:8px; }
+    .error { color:#b00020; margin-top:8px; }
+    pre { background:#f0f4ff; padding:8px; border-radius:6px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Secure Payment Form (Demo)</h2>
+    <p class="note">This demo performs client-side validation only. For real payments use a payment gateway (Stripe, PayPal, Razorpay) and never store full card data on your server.</p>
+
+    <form id="payment-form" autocomplete="off">
+      <label for="name">Name on card</label>
+      <input id="name" type="text" placeholder="Full name" required />
+
+      <label for="card-number">Card number</label>
+      <input id="card-number" type="tel" inputmode="numeric" placeholder="4242 4242 4242 4242" required />
+
+      <div class="row">
+        <div class="col">
+          <label for="expiry">Expiry (MM/YY)</label>
+          <input id="expiry" type="text" placeholder="MM/YY" required />
+        </div>
+        <div class="col">
+          <label for="cvc">CVC</label>
+          <input id="cvc" type="tel" inputmode="numeric" placeholder="123" required />
+        </div>
+      </div>
+
+      <button class="btn" type="submit">Pay (Demo)</button>
+
+      <div id="message" class="error" role="alert" aria-live="polite"></div>
+    </form>
+
+    <hr style="margin:18px 0" />
+
+    <h4>Notes</h4>
+    <ul>
+      <li>Client-side validation is for user convenience only. It does <strong>not</strong> authorize payments.</li>
+      <li>To process payments safely, use a gateway (Stripe, PayPal, Razorpay). See commented Stripe integration in this file.</li>
+    </ul>
+  </div>
+
+  <script>
+    // Luhn algorithm: returns true if number passes Luhn check
+    function luhnCheck(cardNumber) {
+      if (!cardNumber) return false;
+      // remove non-digit chars
+      const sanitized = cardNumber.replace(/\D/g, '');
+      let sum = 0;
+      let shouldDouble = false;
+      for (let i = sanitized.length - 1; i >= 0; i--) {
+        let digit = parseInt(sanitized.charAt(i), 10);
+        if (shouldDouble) {
+          digit *= 2;
+          if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        shouldDouble = !shouldDouble;
+      }
+      return (sum % 10) === 0;
+    }
+
+    function validateExpiry(exp) {
+      // accept MM/YY or MM/YYYY
+      const m = exp.replace(/\s+/g,'').match(/^(\d{1,2})\/(\d{2,4})$/);
+      if (!m) return false;
+      let mm = parseInt(m[1],10), yy = parseInt(m[2],10);
+      if (mm < 1 || mm > 12) return false;
+      if (m[2].length === 2) {
+        // convert YY to 20YY
+        yy += 2000;
+      }
+      const now = new Date();
+      const expDate = new Date(yy, mm); // first day of month after expiry
+      return expDate > now;
+    }
+
+    document.getElementById('payment-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const card = document.getElementById('card-number').value.trim();
+      const expiry = document.getElementById('expiry').value.trim();
+      const cvc = document.getElementById('cvc').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const msg = document.getElementById('message');
+      msg.textContent = '';
+
+      if (!name) { msg.textContent = 'Please enter name on card.'; return; }
+      if (!luhnCheck(card)) { msg.textContent = 'Card number appears invalid (failed Luhn check).'; return; }
+      if (!validateExpiry(expiry)) { msg.textContent = 'Expiry date invalid or card expired.'; return; }
+      if (!/^\d{3,4}$/.test(cvc)) { msg.textContent = 'Enter a valid 3 or 4 digit CVC.'; return; }
+
+      // At this point card details are syntactically valid.
+      // IMPORTANT: Do NOT send raw full card details to your server unless you are PCI compliant.
+      // Instead, use a payment gateway SDK / tokenization (example below).
+      msg.style.color = 'green';
+      msg.textContent = 'Card looks valid (demo). To actually process payment, integrate with a payment gateway (e.g., Stripe).';
+
+      // Example: if using Stripe you'd send the card to Stripe.js to get a token, then send token to your server.
+      // See commented example below for Stripe Elements integration.
+    });
+
+    /* ---------------------------
+       OPTIONAL: Stripe Elements example (high-level)
+       ---------------------------
+       1) Include Stripe.js in your page:
+          <script src="https://js.stripe.com/v3/"></script>
+
+       2) Initialize Stripe with your publishable key (replace placeholder):
+          const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY');
+
+       3) Create Elements, mount a Card Element, and on submit call stripe.createToken or stripe.createPaymentMethod,
+          then send returned token/payment_method id to your server over HTTPS.
+
+       Example (very short):
+          const elements = stripe.elements();
+          const cardElement = elements.create('card');
+          cardElement.mount('#card-element');
+
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const {token, error} = await stripe.createToken(cardElement);
+            if (error) showError(error.message);
+            else sendTokenToServer(token.id); // server calls Stripe API (secret key) to create charge/payment intent
+          });
+
+       IMPORTANT: Never use secret keys in client-side code; only use publishable keys in the browser.
+       Always follow the payment provider's official integration docs & PCI guidance.
+    */
+  </script>
+</body>
+</html>
+
