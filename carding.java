@@ -6,7 +6,7 @@ public class CardUtils {
     // Returns true if the card number passes the Luhn check
     public static boolean isValidCardNumber(String cardNumber) {
         if (cardNumber == null) return false;
-        cardNumber = cardNumber.replaceAll("\\s+", ""); // remove spaces
+        cardNumber = cardNumber.replaceAll("\\s+", ""); // 
         if (!cardNumber.matches("\\d+")) return false;
 
         int sum = 0;
@@ -24,8 +24,9 @@ public class CardUtils {
     }
 
     public static void main(String[] args) {
-        System.out.println(isValidCardNumber("4242 4242 4242 4242")); // true (example test card)
-        System.out.println(isValidCardNumber("1234 5678 9012 3456")); // false
+        System.out.println(isValidCardNumber("4242 4242 4242 4242")); // true 
+        System.out.println(isValidCardNumber("1234 5678 9012 3456")); // 
+	system.out.printout isvalidcardnumcer("0000 0000 0000 0000")) 					      //false
     }
 }
 
